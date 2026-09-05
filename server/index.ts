@@ -1,6 +1,6 @@
 import * as readline from 'node:readline/promises';
 import { stdin as input, stdout as output } from 'node:process';
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Type} from "@google/genai";
 import "dotenv/config";
 //For reading from terminal.
 const rl = readline.createInterface({ input, output });
@@ -19,10 +19,17 @@ interface Message{
   type : string,
   content :Content[] 
 }
-//Array of Messages
-const history : Message[] = []
 
+//GEMINI--------------------
+interface Thought{
+  signature : string,
+  type : string
+}
+const Step : typeof Step;
+//_________
+const history : (Message | Thought | Step)[] = [];
 //------------------------------
+//Array of Messages
 
 while(true){
 const prompt : string = await rl.question('Please type in a prompt. ');
@@ -30,7 +37,7 @@ if (prompt == "Bye" || prompt == "bye" || prompt == "Quit" || prompt == "quit"){
   break;
 }
 
-let con : Content = {
+const con : Content = {
   type:"text",
   text: prompt
 }
@@ -43,13 +50,23 @@ let message : Message = {
 history.push(message);
 
 const interaction = await ai.interactions.create({
-  model: "gemini-3.8-flash",
+  model: "gemini-3.5-flash-lite",
   input: prompt, 
   store : false
 });
 
+interaction.steps.forEach((step)=> history.push(step))
+
+
+
 console.log(interaction.output_text);
-console.log(interaction.steps)
+//Debugging
+/*
+console.log(interaction.steps);
+let check = interaction.steps[1];
+if(check.type === "model_output")
+console.log(check.content)
+*/
 }
  rl.close();
 
