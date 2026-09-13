@@ -1,8 +1,9 @@
 import * as readline from 'node:readline/promises';
-import getCurrentTime from './tools/getCurrentTime';
 import { stdin as input, stdout as output } from 'node:process';
-import { GoogleGenAI, Tool,}  from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 import "dotenv/config";
+import executeTool from './tools/executeTool';
+import { Content, Message, InteractionRequest, getTime } from './tools/definitions';
 //For reading from terminal.
 const rl = readline.createInterface({ input, output });
 //Ai Object
@@ -10,59 +11,8 @@ const ai = new GoogleGenAI({
  apiKey : process.env.GEMINI_API_KEY
 });
 
-
-
-//INTERFACES---------------
-//Content
-interface Content{
-  type : string,
-  text : string
-}
-//Message
-interface Message{
-  type : string,
-  content :Content[] 
-}
-
-//GEMINI--------------------
-
-const history: any[] = [];
-
-//TOOLS -- INTERFACE
-interface FunctionTool{
-  type : 'function',
-  name : string,
-  description : string,
-}
-//FUNCTION RESULT INTERFACE
-
-interface Result{
-  type: string,
-  text: string,
-}
-
-interface Input{
-   type: 'function_result',
-    name: string,
-    call_id: string,
-    result: Result[]
-}
-
-interface InteractionRequest{
-    model : string,
-    input: Input[],
-    tools: FunctionTool[]
-}
-//TOOLS------------------------------
-
-const getTime: FunctionTool = {
-  type: 'function',
-  name : 'getCurrentTime',
-  description : 'Get the current time in the clients local area.'
-
-}
 //Array of Messages
-
+const history: any[] = [];
 
 while (true) {
   const prompt: string = await rl.question('Please type in a prompt. ');
@@ -89,31 +39,21 @@ while (true) {
     store: false,
     tools: [getTime],
   });
+  
   //Push current convo to history so that gemini has context
   interaction.steps.forEach((step) => history.push(step));
     //Detect the requested tool. 
     const fcStep = interaction.steps.find(s => s.type === 'function_call');
 
     if(fcStep && fcStep.name === 'getCurrentTime'){
-      const result = getCurrentTime();
-      console.log(`The current time is: ${result}`);
-      const interRes : Result = {
-          type: 'text',
-          text: result,
-      }
-      
-      const input : Input = {
-        type: 'function_result',
-        name: fcStep.name,
-        call_id: fcStep.id,
-        result: [interRes],
-      }
+      const input = executeTool(fcStep.name, fcStep.id);
 
-      const interaction : InteractionRequest = {
+      if(input){
+        const interaction : InteractionRequest = {
           model: "gemini-3.5-flash-lite",
           input: [input],
           tools: [getTime]
-
+        }
       }
     }
     
