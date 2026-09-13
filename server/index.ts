@@ -89,10 +89,11 @@ while (true) {
     store: false,
     tools: [getTime],
   });
-
+  //Push current convo to history so that gemini has context
+  interaction.steps.forEach((step) => history.push(step));
     //Detect the requested tool. 
     const fcStep = interaction.steps.find(s => s.type === 'function_call');
- 
+
     if(fcStep && fcStep.name === 'getCurrentTime'){
       const result = getCurrentTime();
       console.log(`The current time is: ${result}`);
@@ -115,9 +116,9 @@ while (true) {
 
       }
     }
-  
-  interaction.steps.forEach((step) => history.push(step));  
-
+    
+  else{
   console.log("AURA: " + interaction.output_text);
+  }
  }
  rl.close();
