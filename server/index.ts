@@ -1,64 +1,101 @@
 import * as readline from 'node:readline/promises';
 import { stdin as input, stdout as output } from 'node:process';
-import { GoogleGenAI } from "@google/genai";
-import "dotenv/config";
+import { GoogleGenAI, FunctionCallingConfigMode } from '@google/genai';
+import 'dotenv/config';
 import executeTool from './tools/executeTool';
-import { Content, Message, InteractionRequest, getTime } from './tools/definitions';
-//For reading from terminal.
+import { getTime, getWeather, readFileTool } from './tools/definitions';
+
 const rl = readline.createInterface({ input, output });
-//Ai Object
 const ai = new GoogleGenAI({
- apiKey : process.env.GEMINI_API_KEY
+  apiKey: process.env.GEMINI_API_KEY,
 });
 
-//Array of Messages
-const history: any[] = [];
+const toolDeclarations = [
+  {
+    name: getTime.name,
+    description: getTime.description,
+    parameters: {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    name: getWeather.name,
+    description: getWeather.description,
+    parameters: {
+      type: 'object',
+      properties: {
+        city: {
+          type: 'string',
+          description: 'The city to get the current weather for.',
+        },
+      },
+      required: ['city'],
+    },
+  },
+  {
+    name: readFileTool.name,
+    description: readFileTool.description,
+    parameters: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          description: 'The path to the file to read.',
+        },
+      },
+      required: ['file'],
+    },
+  },
+];
+
+const chat = ai.chats.create({
+  model: 'gemini-3.5-flash-lite',
+  config: {
+    tools: [{ functionDeclarations: toolDeclarations as never }],
+    toolConfig: {
+      functionCallingConfig: {
+        mode: FunctionCallingConfigMode.AUTO,
+      },
+    },
+  },
+});
 
 while (true) {
   const prompt: string = await rl.question('Please type in a prompt. ');
 
-  if (prompt == "Bye" || prompt == "bye" || prompt == "Quit" || prompt == "quit") {
+  if (prompt == 'Bye' || prompt == 'bye' || prompt == 'Quit' || prompt == 'quit') {
     break;
   }
 
-  const con: Content = {
-    type: "text",
-    text: prompt
-  };
+  const response = await chat.sendMessage({ message: prompt });
 
-  const message: Message = {
-    type: "user_input",
-    content: [con]
-  };
-
-  history.push(message);
-
-  const interaction = await ai.interactions.create({
-    model: "gemini-3.5-flash-lite",
-    input: history,
-    store: false,
-    tools: [getTime],
-  });
-  
-  //Push current convo to history so that gemini has context
-  interaction.steps.forEach((step) => history.push(step));
-    //Detect the requested tool. 
-    const fcStep = interaction.steps.find(s => s.type === 'function_call');
-
-    if(fcStep && fcStep.name === 'getCurrentTime'){
-      const input = executeTool(fcStep.name, fcStep.id);
-
-      if(input){
-        const interaction : InteractionRequest = {
-          model: "gemini-3.5-flash-lite",
-          input: [input],
-          tools: [getTime]
-        }
-      }
-    }
-    
-  else{
-  console.log("AURA: " + interaction.output_text);
+  if (!response.functionCalls || response.functionCalls.length === 0) {
+    console.log('AURA: ' + response.text);
+    continue;
   }
- }
- rl.close();
+
+  for (const functionCall of response.functionCalls) {
+    const toolArgs = (functionCall.args ?? {}) as Record<string, unknown>;
+    const input = await executeTool(functionCall.name ?? '', functionCall.id ?? '', toolArgs);
+
+    if (!input) {
+      continue;
+    }
+
+    const followUp = await chat.sendMessage({
+      message: [{
+        functionResponse: {
+          id: functionCall.id,
+          name: functionCall.name,
+          response: { output: input.result[0].text },
+        },
+      }],
+    });
+
+    console.log('AURA: ' + followUp.text);
+  }
+}
+
+rl.close();

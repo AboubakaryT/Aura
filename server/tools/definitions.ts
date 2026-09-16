@@ -43,3 +43,15 @@ export const getTime: FunctionTool = {
   name : 'getCurrentTime',
   description : 'Get the current time in the clients local area.'
 }
+
+export const getWeather: FunctionTool = {
+  type: 'function',
+  name : 'getWeather',
+  description : 'Get the current weather for a city.'
+}
+
+export const readFileTool: FunctionTool = {
+  type: 'function',
+  name : 'readFile',
+  description : 'Read the contents of a file from the project.'
+}
