@@ -4,7 +4,7 @@ import Microphone from 'node-microphone';
 const mic = new Microphone({
      rate: '16000',
     channels: '1',
-    fileType: 'raw',
+    fileType: 'wav',
 })
 console.log("1. File started");
 const fileStream = createWriteStream("recording.raw");
