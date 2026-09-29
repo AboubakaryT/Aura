@@ -55,3 +55,4 @@ export const readFileTool: FunctionTool = {
   name : 'readFile',
   description : 'Read the contents of a file from the project.'
 }
+
